@@ -52,16 +52,16 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-    // Function to remove 'is-loading' class from quizQuestionWrapper elements
+    // Function to remove 'is-loading' class from quizQuestionWrapper elements and loading element
     function removeLoadingClass() {
-        console.log('Removing is-loading class from quizQuestionWrapper elements.');
+        console.log('Removing is-loading class from quizQuestionWrapper elements and loading element.');
         const quizQuestionWrappers = paintingList.querySelectorAll("[game='quizQuestionWrapper']");
         quizQuestionWrappers.forEach(wrapper => wrapper.classList.remove('is-loading'));
 
-        // Hide the loading element
+        // Remove 'is-loading' class from the loading element
         const loadingElement = document.querySelector("[game='loading']");
         if (loadingElement) {
-            loadingElement.classList.add('hide');
+            loadingElement.classList.remove('is-loading');
         }
     }
 
@@ -231,7 +231,7 @@ document.addEventListener('DOMContentLoaded', function() {
         options[6].dataset.correct = 'false';
         options[6].classList.remove('is-correct', 'is-incorrect');
 
-        // Disable option 5 if lives <= 1
+        // Remove any disabling of option 5
         updateOption5State(options[5]);
 
         // Set up event listeners for options
@@ -247,16 +247,12 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
-    // Update option5 (Skip Question) state based on lives
+    // Update option5 (Skip Question) state (now always enabled)
     function updateOption5State(option5Element) {
-        console.log('Updating Option5 state based on lives.');
-        if (lives <= 1) {
-            option5Element.disabled = true;
-            option5Element.classList.add('is-disabled');
-        } else {
-            option5Element.disabled = false;
-            option5Element.classList.remove('is-disabled');
-        }
+        console.log('Ensuring Option5 (Skip Question) is enabled.');
+        // Option 5 is always enabled now
+        option5Element.disabled = false;
+        option5Element.classList.remove('is-disabled');
     }
 
     // Handle option selection
@@ -297,26 +293,19 @@ document.addEventListener('DOMContentLoaded', function() {
                 lives--;
                 correctStreak = 0;
                 updateLivesUI();
-                updateOption5State(options[5]); // Update skip option state
+                // Option 5 remains enabled regardless of lives
                 // Do not add 'is-guessed' class
                 checkIfGameOverOrWon();
             }
         } else if (optionIndex === 5) {
-            if (lives > 1) {
-                console.log('Skipping question. Deducting one life.');
-                // Skip question
-                lives--;
-                updateLivesUI();
-                correctStreak = 0;
-                updateOption5State(options[5]);
+            console.log('Skipping question. Deducting one life.');
+            // Skip question
+            lives--;
+            updateLivesUI();
+            correctStreak = 0;
 
-                quizQuestionWrapper.classList.add('is-guessed');
-                checkIfGameOverOrWon();
-            } else {
-                // Option 5 is disabled when lives <= 1
-                console.log('Option 5 is disabled due to insufficient lives.');
-                return;
-            }
+            quizQuestionWrapper.classList.add('is-guessed');
+            checkIfGameOverOrWon();
         } else if (optionIndex === 6) {
             // Start over the game with the same questions
             console.log('Starting over the game.');
@@ -392,13 +381,7 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         });
 
-        // Update skip option state for the current question
-        const activeQuestions = paintingList.querySelectorAll("[game='quizQuestionWrapper']:not(.is-guessed)");
-        if (activeQuestions.length > 0) {
-            const currentQuestion = activeQuestions[0];
-            const option5Element = currentQuestion.querySelector("[game='option5']");
-            updateOption5State(option5Element);
-        }
+        // No need to update option 5 state, as it's always enabled
     }
 
     // Update score in the UI
@@ -430,7 +413,6 @@ document.addEventListener('DOMContentLoaded', function() {
             } else {
                 // If no active questions, and game over, but option6 is selected
                 if (optionIndex === 6) {
-                    // We can get any question to pass to handleOptionSelect
                     currentQuestion = paintingList.querySelector("[game='quizQuestionWrapper']");
                 } else {
                     return;
