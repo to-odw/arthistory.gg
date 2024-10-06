@@ -57,6 +57,12 @@ document.addEventListener('DOMContentLoaded', function() {
         console.log('Removing is-loading class from quizQuestionWrapper elements.');
         const quizQuestionWrappers = paintingList.querySelectorAll("[game='quizQuestionWrapper']");
         quizQuestionWrappers.forEach(wrapper => wrapper.classList.remove('is-loading'));
+
+        // Hide the loading element
+        const loadingElement = document.querySelector("[game='loading']");
+        if (loadingElement) {
+            loadingElement.classList.add('hide');
+        }
     }
 
     // Function to select random questions and initialize the game
@@ -115,10 +121,22 @@ document.addEventListener('DOMContentLoaded', function() {
         lives = 3;
         correctStreak = 0;
         score = 0;
+
+        initializeLivesUI();
         updateLivesUI();
         updateScoreUI();
 
         console.log('Game is ready to start.');
+    }
+
+    // Function to initialize the lives UI
+    function initializeLivesUI() {
+        lifeCounter.innerHTML = '';
+        for (let i = 0; i < lives; i++) {
+            let life = document.createElement('div');
+            life.classList.add('is-life');
+            lifeCounter.appendChild(life);
+        }
     }
 
     // Function to reset the game state without changing the questions
@@ -155,7 +173,7 @@ document.addEventListener('DOMContentLoaded', function() {
         console.log('Game has been reset.');
     }
 
-    // Setup options for a question
+    // Setup options for each question
     function setupQuestionOptions(quizQuestionWrapper) {
         // The correct artist is assumed to be the text content of option1Text before shuffling
         let correctArtistElement = quizQuestionWrapper.querySelector("[game='option1Text']");
@@ -243,16 +261,10 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Handle option selection
     function handleOptionSelect(optionIndex, quizQuestionWrapper) {
-        if (lives <= 0 || score >= winningScore) {
-            // Do nothing if game is over or won
+        // Allow option6 to function even if game is over
+        if ((lives <= 0 || score >= winningScore) && optionIndex !== 6) {
+            // Do nothing if game is over or won, unless option6 is selected
             console.log('Game is over or won. Input ignored.');
-            return;
-        }
-
-        // Only handle options for questions not yet guessed
-        if (quizQuestionWrapper.classList.contains('is-guessed')) {
-            // Question already answered or skipped
-            console.log('Question already guessed. Input ignored.');
             return;
         }
 
@@ -360,12 +372,26 @@ document.addEventListener('DOMContentLoaded', function() {
     // Update lives in the UI
     function updateLivesUI() {
         console.log(`Updating lives UI. Lives remaining: ${lives}`);
-        lifeCounter.innerHTML = '';
-        for (let i = 0; i < lives; i++) {
+
+        const lifeElements = lifeCounter.querySelectorAll('.is-life');
+
+        // If there are fewer life elements than lives, add more life elements
+        while (lifeElements.length < lives) {
             let life = document.createElement('div');
             life.classList.add('is-life');
             lifeCounter.appendChild(life);
+            lifeElements = lifeCounter.querySelectorAll('.is-life');
         }
+
+        // Update the classes based on lives
+        lifeElements.forEach((lifeElement, index) => {
+            if (index < lives) {
+                lifeElement.classList.remove('is-lost');
+            } else {
+                lifeElement.classList.add('is-lost');
+            }
+        });
+
         // Update skip option state for the current question
         const activeQuestions = paintingList.querySelectorAll("[game='quizQuestionWrapper']:not(.is-guessed)");
         if (activeQuestions.length > 0) {
@@ -398,15 +424,25 @@ document.addEventListener('DOMContentLoaded', function() {
         if (key >= '1' && key <= '6') {
             const optionIndex = parseInt(key);
             const activeQuestions = paintingList.querySelectorAll("[game='quizQuestionWrapper']:not(.is-guessed)");
+            let currentQuestion;
             if (activeQuestions.length > 0) {
-                const currentQuestion = activeQuestions[0];
-                const options = {};
-                for (let i = 1; i <= 6; i++) {
-                    options[i] = currentQuestion.querySelector(`[game='option${i}']`);
+                currentQuestion = activeQuestions[0];
+            } else {
+                // If no active questions, and game over, but option6 is selected
+                if (optionIndex === 6) {
+                    // We can get any question to pass to handleOptionSelect
+                    currentQuestion = paintingList.querySelector("[game='quizQuestionWrapper']");
+                } else {
+                    return;
                 }
-                if (options[optionIndex]) {
-                    options[optionIndex].click();
-                }
+            }
+
+            const options = {};
+            for (let i = 1; i <= 6; i++) {
+                options[i] = currentQuestion.querySelector(`[game='option${i}']`);
+            }
+            if (options[optionIndex]) {
+                options[optionIndex].click();
             }
         }
     });
