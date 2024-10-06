@@ -63,11 +63,11 @@ document.addEventListener('DOMContentLoaded', function() {
     function selectRandomQuestionsAndInitializeGame() {
         console.log('Selecting random questions and initializing game...');
         // Get all quizQuestionWrappers
-        allQuizQuestionWrappers = Array.from(paintingList.querySelectorAll("[game='quizQuestionWrapper']"));
-        console.log(`Total quiz questions available before selection: ${allQuizQuestionWrappers.length}`);
+        const allQuestions = Array.from(paintingList.querySelectorAll("[game='quizQuestionWrapper']"));
+        console.log(`Total quiz questions available before selection: ${allQuestions.length}`);
 
         // Collect all artist names from the game='option1Text' content
-        allArtistNames = allQuizQuestionWrappers
+        allArtistNames = allQuestions
             .map(q => {
                 const option1TextElement = q.querySelector("[game='option1Text']");
                 if (option1TextElement) {
@@ -82,17 +82,17 @@ document.addEventListener('DOMContentLoaded', function() {
         allArtistNames = [...new Set(allArtistNames)];
         console.log(`Total unique artist names collected: ${allArtistNames.length}`);
 
-        // Randomly select the desired number of quizQuestionWrappers and remove the rest
-        shuffleArray(allQuizQuestionWrappers);
-        const selectedQuestions = allQuizQuestionWrappers.slice(0, numberOfQuestions);
+        // Randomly select the desired number of quizQuestionWrappers
+        shuffleArray(allQuestions);
+        const selectedQuestions = allQuestions.slice(0, numberOfQuestions);
 
         console.log(`Selected ${selectedQuestions.length} questions for the game.`);
 
-        // Remove all other quizQuestionWrapper elements from paintingList
+        // Remove all other quizQuestionWrapper elements from the DOM
         const selectedQuestionSet = new Set(selectedQuestions);
-        allQuizQuestionWrappers.forEach(question => {
+        allQuestions.forEach(question => {
             if (!selectedQuestionSet.has(question)) {
-                paintingList.removeChild(question);
+                question.remove();
             }
         });
 
@@ -119,6 +119,40 @@ document.addEventListener('DOMContentLoaded', function() {
         updateScoreUI();
 
         console.log('Game is ready to start.');
+    }
+
+    // Function to reset the game state without changing the questions
+    function resetGameState() {
+        console.log('Resetting game state...');
+        lives = 3;
+        correctStreak = 0;
+        score = 0;
+        updateLivesUI();
+        updateScoreUI();
+
+        // Remove 'is-guessed', 'is-correct', 'is-incorrect' classes from options and quizQuestionWrappers
+        allQuizQuestionWrappers.forEach(quizQuestionWrapper => {
+            quizQuestionWrapper.classList.remove('is-guessed');
+            const options = {};
+            for (let i = 1; i <= 6; i++) {
+                options[i] = quizQuestionWrapper.querySelector(`[game='option${i}']`);
+                if (options[i]) {
+                    options[i].classList.remove('is-correct', 'is-incorrect', 'is-disabled');
+                    options[i].disabled = false; // Re-enable options
+                }
+            }
+            // Re-setup option 5 state
+            const option5Element = options[5];
+            if (option5Element) {
+                updateOption5State(option5Element);
+            }
+        });
+
+        // Hide game over and win screens if they are visible
+        gameOverElement.classList.remove('show');
+        gameWinElement.classList.remove('show');
+
+        console.log('Game has been reset.');
     }
 
     // Setup options for a question
@@ -241,8 +275,10 @@ document.addEventListener('DOMContentLoaded', function() {
                     updateLivesUI();
                 }
 
-                quizQuestionWrapper.classList.add('is-guessed');
-                checkIfGameOverOrWon();
+                setTimeout(() => {
+                    quizQuestionWrapper.classList.add('is-guessed');
+                    checkIfGameOverOrWon();
+                }, 500); // Wait 500ms before adding 'is-guessed' class
             } else {
                 console.log(`Incorrect answer selected: Option ${optionIndex}`);
                 options[optionIndex].classList.add('is-incorrect');
@@ -250,7 +286,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 correctStreak = 0;
                 updateLivesUI();
                 updateOption5State(options[5]); // Update skip option state
-                quizQuestionWrapper.classList.add('is-guessed');
+                // Do not add 'is-guessed' class
                 checkIfGameOverOrWon();
             }
         } else if (optionIndex === 5) {
@@ -270,9 +306,9 @@ document.addEventListener('DOMContentLoaded', function() {
                 return;
             }
         } else if (optionIndex === 6) {
-            // Start over (reload the page)
+            // Start over the game with the same questions
             console.log('Starting over the game.');
-            location.reload();
+            resetGameState();
         }
     }
 
