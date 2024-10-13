@@ -20,7 +20,7 @@ document.addEventListener('DOMContentLoaded', function() {
     let allArtistNames = [];
 
     // Initialize the game after waiting for paintingList to stabilize
-    waitForPaintingListToStabilize(500).then(() => {
+    waitForPaintingListToStabilize(600).then(() => {
         selectRandomQuestionsAndInitializeGame();
         removeLoadingClass();
     });
@@ -252,7 +252,7 @@ document.addEventListener('DOMContentLoaded', function() {
         // Set up event listeners for options
         for (let i = 1; i <= 6; i++) {
             options[i].addEventListener('click', function() {
-                handleOptionSelect(i, quizQuestionWrapper);
+                handleOptionSelect(i, quizQuestionWrapper, this);
             });
         }
     }
@@ -266,7 +266,7 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     // Handle option selection
-    function handleOptionSelect(optionIndex, quizQuestionWrapper) {
+    function handleOptionSelect(optionIndex, quizQuestionWrapper, optionElement) {
         // Allow option6 to function even if game is over
         if ((lives <= 0 || score >= winningScore) && optionIndex !== 6) {
             // Do nothing if game is over or won, unless option6 is selected
@@ -274,18 +274,29 @@ document.addEventListener('DOMContentLoaded', function() {
             return;
         }
 
-        const options = {};
-        if (quizQuestionWrapper) {
-            for (let i = 1; i <= 6; i++) {
-                options[i] = quizQuestionWrapper.querySelector(`[game='option${i}']`);
-            }
+        if (optionIndex === 6) {
+            // Start over the game with the same questions
+            console.log('Starting over the game.');
+            resetGameState();
+            return;
         }
 
+        if (!quizQuestionWrapper) {
+            console.log('No active question. Input ignored.');
+            return;
+        }
+
+        if (!optionElement) {
+            console.log(`Option ${optionIndex} not found in current question. Input ignored.`);
+            return;
+        }
+
+        const isCorrect = optionElement.dataset.correct === 'true';
+
         if (optionIndex >= 1 && optionIndex <= 4) {
-            const isCorrect = options[optionIndex].dataset.correct === 'true';
             if (isCorrect) {
                 console.log(`Correct answer selected: Option ${optionIndex}`);
-                options[optionIndex].classList.add('is-correct');
+                optionElement.classList.add('is-correct');
                 correctStreak++;
                 score++;
                 updateScoreUI();
@@ -298,10 +309,13 @@ document.addEventListener('DOMContentLoaded', function() {
                 setTimeout(() => {
                     quizQuestionWrapper.classList.add('is-guessed');
                     checkIfGameOverOrWon();
-                }, 500); // Wait 500ms before adding 'is-guessed' class
+                }, 600); // Wait 500ms before adding 'is-guessed' class
             } else {
                 console.log(`Incorrect answer selected: Option ${optionIndex}`);
-                options[optionIndex].classList.add('is-incorrect');
+                optionElement.classList.add('is-incorrect');
+                if (lives==1) {
+                    quizQuestionWrapper.classList.add('is-guessed');
+                }
                 lives--;
                 correctStreak = 0;
                 updateLivesUI();
@@ -317,10 +331,6 @@ document.addEventListener('DOMContentLoaded', function() {
 
             quizQuestionWrapper.classList.add('is-guessed');
             checkIfGameOverOrWon();
-        } else if (optionIndex === 6) {
-            // Start over the game with the same questions
-            console.log('Starting over the game.');
-            resetGameState();
         }
     }
 
@@ -380,7 +390,6 @@ document.addEventListener('DOMContentLoaded', function() {
             let life = document.createElement('div');
             life.classList.add('is-life');
             lifeCounter.appendChild(life);
-            lifeElements = lifeCounter.querySelectorAll('.is-life');
         }
 
         // Update the classes based on lives
@@ -410,25 +419,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
-    // Event listener for keyboard input (keys 1-6)
-    document.addEventListener('keydown', function(event) {
-        const key = event.key;
-        if (key >= '1' && key <= '6') {
-            const optionIndex = parseInt(key);
-            const activeQuestions = paintingList.querySelectorAll("[game='quizQuestionWrapper']:not(.is-guessed)");
-            if (activeQuestions.length > 0) {
-                const currentQuestion = activeQuestions[0];
-                handleOptionSelect(optionIndex, currentQuestion);
-            } else {
-                // If no active questions, and option6 is selected
-                if (optionIndex === 6) {
-                    handleOptionSelect(6, null);
-                } else {
-                    console.log('No active questions and option6 not selected. Input ignored.');
-                }
-            }
-        }
-    });
+    // Removed the keyboard event listener for hotkeys
 
     // Event listener for new game button
     if (newGameButton) {
