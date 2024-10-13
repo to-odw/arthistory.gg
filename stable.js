@@ -1,4 +1,3 @@
-<script>
 document.addEventListener('DOMContentLoaded', function() {
     // Game variables
     let lives = 3;
@@ -470,5 +469,3 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 });
-
-</script>
