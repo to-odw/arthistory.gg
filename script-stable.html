@@ -20,36 +20,40 @@ document.addEventListener('DOMContentLoaded', function() {
     let allArtistNames = [];
 
     // Initialize the game after waiting for paintingList to stabilize
-    waitForPaintingListToStabilize(600).then(() => {
+    waitForPaintingListToStabilize(500).then(() => {
         selectRandomQuestionsAndInitializeGame();
         removeLoadingClass();
     });
 
-    // Function to wait until paintingList is stable for a given duration (in ms)
+    // Function to wait until paintingList is stable for a given duration (in ms) using MutationObserver
     function waitForPaintingListToStabilize(duration) {
-        console.log('Waiting for paintingList to stabilize...');
+        console.log('Waiting for paintingList to stabilize using MutationObserver...');
         return new Promise(resolve => {
-            let lastChildCount = paintingList.childElementCount;
             let stabilityTimer = null;
 
-            const checkStability = () => {
-                const currentChildCount = paintingList.childElementCount;
-                if (currentChildCount === lastChildCount) {
-                    if (stabilityTimer === null) {
-                        stabilityTimer = setTimeout(() => {
-                            console.log('paintingList is stable.');
-                            resolve();
-                        }, duration);
-                    }
-                } else {
+            const observer = new MutationObserver((mutationsList, observer) => {
+                // Reset the timer whenever a mutation occurs
+                if (stabilityTimer !== null) {
                     clearTimeout(stabilityTimer);
-                    stabilityTimer = null;
-                    lastChildCount = currentChildCount;
                 }
-                requestAnimationFrame(checkStability);
-            };
+                stabilityTimer = setTimeout(() => {
+                    // No mutations have occurred for 'duration' milliseconds
+                    console.log('paintingList is stable.');
+                    observer.disconnect();
+                    resolve();
+                }, duration);
+            });
 
-            checkStability();
+            // Start observing the paintingList for childList changes
+            observer.observe(paintingList, { childList: true });
+
+            // Also start the timer initially in case no mutations occur
+            stabilityTimer = setTimeout(() => {
+                // No mutations have occurred for 'duration' milliseconds
+                console.log('paintingList is stable (no mutations observed).');
+                observer.disconnect();
+                resolve();
+            }, duration);
         });
     }
 
