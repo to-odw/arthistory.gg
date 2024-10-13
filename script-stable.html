@@ -8,6 +8,11 @@ document.addEventListener('DOMContentLoaded', function() {
     const winningScore = 10;
     const numberOfQuestions = 15; // Variable for the number of questions
 
+    // Global variables
+    let selectedQuestionSet = new Set();
+    let allQuizQuestionWrappers = [];
+    let allArtistNames = [];
+
     // Get DOM elements
     const paintingList = document.querySelector("[game='paintingList']");
     const gameOverElement = document.querySelector("[game='gameOver']");
@@ -16,16 +21,13 @@ document.addEventListener('DOMContentLoaded', function() {
     const lifeCounter = document.querySelector("[game='lifeCounter']");
     const newGameButton = document.querySelector("[game='newGame']");
 
-    let allQuizQuestionWrappers = [];
-    let allArtistNames = [];
-
     // Initialize the game after waiting for paintingList to stabilize
     waitForPaintingListToStabilize(500).then(() => {
         selectRandomQuestionsAndInitializeGame();
         removeLoadingClass();
     });
 
-    // Function to wait until paintingList is stable for a given duration (in ms) using MutationObserver
+    // Function to wait until paintingList is stable for a given duration (in ms)
     function waitForPaintingListToStabilize(duration) {
         console.log('Waiting for paintingList to stabilize using MutationObserver...');
         return new Promise(resolve => {
@@ -45,7 +47,7 @@ document.addEventListener('DOMContentLoaded', function() {
             });
 
             // Start observing the paintingList for childList changes
-            observer.observe(paintingList, { childList: true });
+            observer.observe(paintingList, { childList: true, subtree: true });
 
             // Also start the timer initially in case no mutations occur
             stabilityTimer = setTimeout(() => {
@@ -96,11 +98,12 @@ document.addEventListener('DOMContentLoaded', function() {
         // Randomly select the desired number of quizQuestionWrappers
         shuffleArray(allQuestions);
         const selectedQuestions = allQuestions.slice(0, numberOfQuestions);
-
         console.log(`Selected ${selectedQuestions.length} questions for the game.`);
 
+        // Update the global variable
+        selectedQuestionSet = new Set(selectedQuestions);
+
         // Remove all other quizQuestionWrapper elements from the DOM
-        const selectedQuestionSet = new Set(selectedQuestions);
         allQuestions.forEach(question => {
             if (!selectedQuestionSet.has(question)) {
                 question.remove();
@@ -118,6 +121,40 @@ document.addEventListener('DOMContentLoaded', function() {
 
         // Start the game
         initGame();
+
+        // Start observing for any extra questions added after initialization
+        observeAndRemoveExtraQuestions();
+    }
+
+    // Function to observe and remove extra questions added after initialization
+    function observeAndRemoveExtraQuestions() {
+        const observer = new MutationObserver((mutationsList) => {
+            for (const mutation of mutationsList) {
+                if (mutation.type === 'childList') {
+                    mutation.addedNodes.forEach(node => {
+                        // Ensure node is an element and matches the selector
+                        if (node.nodeType === Node.ELEMENT_NODE && node.matches("[game='quizQuestionWrapper']")) {
+                            if (!selectedQuestionSet.has(node)) {
+                                console.log('Removing extra quizQuestionWrapper added after initialization.');
+                                node.remove();
+                            }
+                        }
+                    });
+                }
+            }
+        });
+
+        // Start observing the paintingList for childList changes
+        observer.observe(paintingList, { childList: true, subtree: false });
+    }
+
+    // Utility function to shuffle an array
+    function shuffleArray(array) {
+        // Fisher-Yates shuffle algorithm
+        for (let i = array.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [array[i], array[j]] = [array[j], array[i]];
+        }
     }
 
     // Initialize the game
