@@ -164,7 +164,6 @@ document.addEventListener('DOMContentLoaded', function() {
         score = 0;
 
         initializeLivesUI();
-        updateLivesUI();
         updateScoreUI();
 
         console.log('Game is ready to start.');
@@ -186,7 +185,7 @@ document.addEventListener('DOMContentLoaded', function() {
         lives = 3;
         correctStreak = 0;
         score = 0;
-        updateLivesUI();
+        initializeLivesUI();
         updateScoreUI();
 
         // Remove 'is-guessed', 'is-correct', 'is-incorrect' classes from options and quizQuestionWrappers
@@ -343,34 +342,51 @@ document.addEventListener('DOMContentLoaded', function() {
 
                 if (correctStreak % correctStreakForBonusLife === 0) {
                     lives++;
-                    updateLivesUI();
+                    addLife();
                 }
 
                 setTimeout(() => {
                     quizQuestionWrapper.classList.add('is-guessed');
                     checkIfGameOverOrWon();
-                }, 600); // Wait 500ms before adding 'is-guessed' class
+                }, 600); // Wait 600ms before adding 'is-guessed' class
             } else {
                 console.log(`Incorrect answer selected: Option ${optionIndex}`);
                 optionElement.classList.add('is-incorrect');
-                if (lives==1) {
+                if (lives == 1) {
                     quizQuestionWrapper.classList.add('is-guessed');
                 }
                 lives--;
+                removeLife();
                 correctStreak = 0;
-                updateLivesUI();
-                // Do not add 'is-guessed' class
+                // Do not add 'is-guessed' class unless it's the last life
                 checkIfGameOverOrWon();
             }
         } else if (optionIndex === 5) {
             console.log('Skipping question. Deducting one life.');
             // Skip question
             lives--;
-            updateLivesUI();
+            removeLife();
             correctStreak = 0;
 
             quizQuestionWrapper.classList.add('is-guessed');
             checkIfGameOverOrWon();
+        }
+    }
+
+    // Add a life to the UI
+    function addLife() {
+        console.log('Adding a life to the UI.');
+        let life = document.createElement('div');
+        life.classList.add('is-life');
+        lifeCounter.appendChild(life);
+    }
+
+    // Remove a life from the UI
+    function removeLife() {
+        console.log('Removing a life from the UI.');
+        const lifeElements = lifeCounter.querySelectorAll('.is-life');
+        if (lifeElements.length > 0) {
+            lifeCounter.removeChild(lifeElements[lifeElements.length - 1]);
         }
     }
 
@@ -419,44 +435,12 @@ document.addEventListener('DOMContentLoaded', function() {
         paintingFacts.forEach(fact => fact.classList.add('show'));
     }
 
-    // Update lives in the UI
-    function updateLivesUI() {
-        console.log(`Updating lives UI. Lives remaining: ${lives}`);
-
-        const lifeElements = lifeCounter.querySelectorAll('.is-life');
-
-        // If there are fewer life elements than lives, add more life elements
-        while (lifeElements.length < lives) {
-            let life = document.createElement('div');
-            life.classList.add('is-life');
-            lifeCounter.appendChild(life);
-        }
-
-        // Update the classes based on lives
-        lifeElements.forEach((lifeElement, index) => {
-            if (index < lives) {
-                lifeElement.classList.remove('is-lost');
-            } else {
-                lifeElement.classList.add('is-lost');
-            }
-        });
-    }
-
     // Update score in the UI
     function updateScoreUI() {
         console.log(`Updating score UI. Current score: ${score}`);
         scoreElements.forEach(scoreElement => {
             scoreElement.textContent = score;
         });
-    }
-
-    // Utility function to shuffle an array
-    function shuffleArray(array) {
-        // Fisher-Yates shuffle algorithm
-        for (let i = array.length - 1; i > 0; i--) {
-            const j = Math.floor(Math.random() * (i + 1));
-            [array[i], array[j]] = [array[j], array[i]];
-        }
     }
 
     // Removed the keyboard event listener for hotkeys
