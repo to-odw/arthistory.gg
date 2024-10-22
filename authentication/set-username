@@ -2,10 +2,26 @@
   // Ensure AWS region is set globally
   AWS.config.region = 'us-east-2';  // Replace with your AWS region
 
+  // Function to get the current username from DynamoDB
+  function getCurrentUsername(userId) {
+    const docClient = new AWS.DynamoDB.DocumentClient();
+
+    const params = {
+      TableName: 'artHistoryGG',
+      KeyConditionExpression: 'UserId = :userId AND DataType = :dataType',
+      ExpressionAttributeValues: {
+        ':userId': userId,
+        ':dataType': 'PublicUsername'
+      }
+    };
+
+    return docClient.query(params).promise();  // Return a promise
+  }
+
   // Function to update username in DynamoDB
   function updateUsername(userId, newUsername) {
     console.log(`Attempting to update username for userId: ${userId} with newUsername: ${newUsername}`);
-    
+
     const docClient = new AWS.DynamoDB.DocumentClient();
 
     const params = {
@@ -17,19 +33,13 @@
       }
     };
 
-    return docClient.put(params).promise()
-      .then(() => {
-        console.log(`Username successfully updated for userId: ${userId} with newUsername: ${newUsername}`);
-      })
-      .catch((err) => {
-        console.error('Error updating username:', err);
-      });
+    return docClient.put(params).promise();  // Return a promise
   }
 
   // Function to check if the username is unique
   function checkUsernameUniqueness(newUsername) {
     console.log(`Checking uniqueness for username: ${newUsername}`);
-    
+
     const docClient = new AWS.DynamoDB.DocumentClient();
 
     const params = {
@@ -42,13 +52,30 @@
       }
     };
 
-    return docClient.query(params).promise()
+    return docClient.query(params).promise();  // Return a promise
+  }
+
+  // Function to load and display the current username as a placeholder in the input field
+  function loadCurrentUsername() {
+    const userId = AWS.config.credentials.identityId;
+
+    console.log(`Fetching current username for userId: ${userId}`);
+
+    getCurrentUsername(userId)
       .then((data) => {
-        console.log(`Query result for username uniqueness check:`, data);
-        return data;
+        if (data.Items && data.Items.length > 0) {
+          const currentUsername = data.Items[0].Username;
+          console.log(`Current username found: ${currentUsername}`);
+
+          // Set the current username as the placeholder value in the input field
+          const usernameInput = document.querySelector('[user="usernameInput"]');
+          usernameInput.placeholder = currentUsername;
+        } else {
+          console.log('No existing username found for this user.');
+        }
       })
       .catch((err) => {
-        console.error('Error querying DynamoDB for uniqueness check:', err);
+        console.error('Error fetching current username:', err);
       });
   }
 
@@ -70,27 +97,31 @@
     // Check if the username is unique
     checkUsernameUniqueness(username)
       .then((data) => {
-        if (data.Items && data.Items.length > 0) {
-          // Username is not unique, show the error message
-          console.log(`Username is not unique: ${username}`);
-          const duplicateMessage = document.querySelector('[user="userNameDuplicate"]');
-          duplicateMessage.classList.add('show');
-        } else {
-          // Username is unique, proceed with updating it
-          console.log(`Username is unique: ${username}`);
-          
-          const userId = AWS.config.credentials.identityId;
-          console.log(`Updating username for userId: ${userId}`);
+        const userId = AWS.config.credentials.identityId;
 
-          updateUsername(userId, username)
-            .then(() => {
-              alert('Username updated successfully.');
-              console.log(`Username updated successfully: ${username}`);
-            })
-            .catch((err) => {
-              console.error('Error updating username:', err);
-            });
+        // If username is found and belongs to another user
+        if (data.Items && data.Items.length > 0) {
+          const existingUser = data.Items[0];
+          if (existingUser.UserId !== userId) {
+            // Username is taken by another user
+            console.log(`Username is already taken by another user: ${username}`);
+            const duplicateMessage = document.querySelector('[user="userNameDuplicate"]');
+            duplicateMessage.classList.add('show');
+            return;
+          }
         }
+
+        // Username is either unique or belongs to the current user, proceed with update
+        console.log(`Username is unique or belongs to the current user: ${username}`);
+
+        updateUsername(userId, username)
+          .then(() => {
+            alert('Username updated successfully.');
+            console.log(`Username updated successfully: ${username}`);
+          })
+          .catch((err) => {
+            console.error('Error updating username:', err);
+          });
       })
       .catch((err) => {
         console.error('Error checking username uniqueness:', err);
@@ -105,4 +136,9 @@
 
   // Add pattern validation on the input field
   document.querySelector('[user="usernameInput"]').setAttribute('pattern', '[a-zA-Z0-9.]{1,15}');
+
+  // Load the current username when the page loads
+  document.addEventListener('DOMContentLoaded', () => {
+    loadCurrentUsername();
+  });
 </script>
