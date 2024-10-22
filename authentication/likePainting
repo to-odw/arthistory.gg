@@ -4,65 +4,46 @@
 
   // Function to like a painting (write to DynamoDB)
   function likePainting(userId, paintingUrl, imgSrc, altText) {
-    // Ensure credentials are ready
-    AWS.config.credentials.get(function(err) {
-      if (err) {
-        console.error("Error loading AWS credentials:", err);
-        return;
+    const docClient = new AWS.DynamoDB.DocumentClient();
+
+    const params = {
+      TableName: 'artHistoryGG',
+      Item: {
+        UserId: userId,
+        DataType: `LikedPainting#${paintingUrl}`,  // Unique identifier for each liked painting
+        PaintingUrl: paintingUrl,
+        ImgSrc: imgSrc,
+        AltText: altText
       }
+    };
 
-      console.log("Credentials are valid. Proceeding with DynamoDB operation...");
-
-      const docClient = new AWS.DynamoDB.DocumentClient();
-
-      const params = {
-        TableName: 'artHistoryGG',
-        Item: {
-          UserId: userId,
-          DataType: `LikedPainting#${paintingUrl}`,  // Unique identifier for each liked painting
-          PaintingUrl: paintingUrl,
-          ImgSrc: imgSrc,
-          AltText: altText
-        }
-      };
-
-      docClient.put(params, function(err, data) {
-        if (err) {
-          console.error("Error liking painting:", err);
-        } else {
-          console.log("Painting liked successfully:", data);
-        }
-      });
+    docClient.put(params, function(err, data) {
+      if (err) {
+        console.error("Error liking painting:", err);
+      } else {
+        console.log("Painting liked successfully:", data);
+      }
     });
   }
 
   // Function to unlike a painting (delete from DynamoDB)
   function unlikePainting(userId, paintingUrl) {
-    AWS.config.credentials.get(function(err) {
-      if (err) {
-        console.error("Error loading AWS credentials:", err);
-        return;
+    const docClient = new AWS.DynamoDB.DocumentClient();
+
+    const params = {
+      TableName: 'artHistoryGG',
+      Key: {
+        UserId: userId,
+        DataType: `LikedPainting#${paintingUrl}`
       }
+    };
 
-      console.log("Credentials are valid. Proceeding with DynamoDB operation...");
-
-      const docClient = new AWS.DynamoDB.DocumentClient();
-
-      const params = {
-        TableName: 'artHistoryGG',
-        Key: {
-          UserId: userId,
-          DataType: `LikedPainting#${paintingUrl}`
-        }
-      };
-
-      docClient.delete(params, function(err, data) {
-        if (err) {
-          console.error("Error unliking painting:", err);
-        } else {
-          console.log("Painting unliked successfully:", data);
-        }
-      });
+    docClient.delete(params, function(err, data) {
+      if (err) {
+        console.error("Error unliking painting:", err);
+      } else {
+        console.log("Painting unliked successfully:", data);
+      }
     });
   }
 
@@ -77,7 +58,7 @@
       const imgSrc = imgElement.getAttribute('src');
       const altText = imgElement.getAttribute('alt');
 
-      // Use cached credentials
+      // Use cached credentials from Script 1
       const userId = AWS.config.credentials.identityId;
 
       // Proceed with the DynamoDB operation (like/unlike)
@@ -91,6 +72,124 @@
     }
   }
 
+  // Function to load liked paintings and update the UI
+  function loadLikedPaintings() {
+    const userId = AWS.config.credentials.identityId;
+    const docClient = new AWS.DynamoDB.DocumentClient();
+
+    const params = {
+      TableName: 'artHistoryGG',
+      KeyConditionExpression: 'UserId = :userId AND begins_with(DataType, :likedPainting)',
+      ExpressionAttributeValues: {
+        ':userId': userId,
+        ':likedPainting': 'LikedPainting#'
+      }
+    };
+
+    // Query DynamoDB for the user's liked paintings
+    docClient.query(params, function(err, data) {
+      if (err) {
+        console.error("Error loading liked paintings:", err);
+      } else {
+        console.log("Liked paintings retrieved:", data.Items);
+        updateLikedPaintingsUI(data.Items);  // Update the UI to reflect liked paintings
+      }
+    });
+  }
+
+  // Function to update the UI to show liked paintings
+  function updateLikedPaintingsUI(likedPaintings) {
+    likedPaintings.forEach(function(item) {
+      const paintingUrl = item.PaintingUrl;
+
+      // Find the corresponding painting link on the page using the painting URL
+      const paintingLink = document.querySelector(`[user="painting"][href="${paintingUrl}"]`);
+      if (paintingLink) {
+        const likeButton = paintingLink.parentElement.querySelector('[user="like"]');
+        if (likeButton) {
+          likeButton.classList.add('is-liked');  // Mark the painting as liked
+        }
+      }
+    });
+  }
+
   // Attach event listener to the document to handle clicks on user="like" elements
   document.addEventListener('click', handleLikeClick);
+
+  // Expose loadLikedPaintings so it can be triggered externally after authentication
+  window.loadLikedPaintings = loadLikedPaintings;
+
+  // Function to observe new paintings being added to the DOM
+  function observeNewPaintings() {
+    const observer = new MutationObserver(function(mutations) {
+      mutations.forEach(function(mutation) {
+        mutation.addedNodes.forEach(function(addedNode) {
+          if (addedNode.nodeType === 1) {  // Ensure it's an element node
+            const newPaintings = addedNode.querySelectorAll('[user="painting"]');
+            newPaintings.forEach(function(paintingLink) {
+              const paintingUrl = paintingLink.getAttribute('href');
+              const likeButton = paintingLink.parentElement.querySelector('[user="like"]');
+
+              // Check if this painting was previously liked by the user and update UI accordingly
+              const userId = AWS.config.credentials.identityId;
+              const docClient = new AWS.DynamoDB.DocumentClient();
+
+              const params = {
+                TableName: 'artHistoryGG',
+                KeyConditionExpression: 'UserId = :userId AND DataType = :dataType',
+                ExpressionAttributeValues: {
+                  ':userId': userId,
+                  ':dataType': `LikedPainting#${paintingUrl}`
+                }
+              };
+
+              docClient.query(params, function(err, data) {
+                if (err) {
+                  console.error("Error checking liked painting status:", err);
+                } else if (data.Items.length > 0 && likeButton) {
+                  likeButton.classList.add('is-liked');  // Mark the painting as liked
+                }
+              });
+            });
+          }
+        });
+      });
+    });
+
+    observer.observe(document.body, { childList: true, subtree: true });
+  }
+
+  // Expose observeNewPaintings so it can be triggered externally
+  window.observeNewPaintings = observeNewPaintings;
+  //script break
+  window.fsAttributes = window.fsAttributes || [];
+  window.fsAttributes.push([
+    'cmsload',
+    (listInstances) => {
+      console.log('cmsload Successfully loaded!');
+
+      // The callback passes a `listInstances` array with all the `CMSList` instances on the page.
+      const [listInstance] = listInstances;
+
+      // The `renderitems` event runs whenever the list renders items after switching pages or loading new items.
+      listInstance.on('renderitems', (renderedItems) => {
+        console.log('New items rendered:', renderedItems);
+
+        // Call loadLikedPaintings to check the newly added user="painting" elements
+        loadLikedPaintings();
+
+        // If you need to observe new paintings dynamically
+        renderedItems.forEach((item) => {
+          // Find all new painting elements within the rendered items
+          const newPaintings = item.element.querySelectorAll('[user="painting"]');
+          newPaintings.forEach((painting) => {
+            console.log('New painting element detected:', painting);
+            
+            // You can do more with the painting element here if needed
+            // E.g., handle clicks, set event listeners, etc.
+          });
+        });
+      });
+    },
+  ]);
 </script>
