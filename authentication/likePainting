@@ -1,0 +1,96 @@
+<script>
+  // Ensure AWS region is set globally
+  AWS.config.region = 'us-east-2';  // Replace with your AWS region
+
+  // Function to like a painting (write to DynamoDB)
+  function likePainting(userId, paintingUrl, imgSrc, altText) {
+    // Ensure credentials are ready
+    AWS.config.credentials.get(function(err) {
+      if (err) {
+        console.error("Error loading AWS credentials:", err);
+        return;
+      }
+
+      console.log("Credentials are valid. Proceeding with DynamoDB operation...");
+
+      const docClient = new AWS.DynamoDB.DocumentClient();
+
+      const params = {
+        TableName: 'artHistoryGG',
+        Item: {
+          UserId: userId,
+          DataType: `LikedPainting#${paintingUrl}`,  // Unique identifier for each liked painting
+          PaintingUrl: paintingUrl,
+          ImgSrc: imgSrc,
+          AltText: altText
+        }
+      };
+
+      docClient.put(params, function(err, data) {
+        if (err) {
+          console.error("Error liking painting:", err);
+        } else {
+          console.log("Painting liked successfully:", data);
+        }
+      });
+    });
+  }
+
+  // Function to unlike a painting (delete from DynamoDB)
+  function unlikePainting(userId, paintingUrl) {
+    AWS.config.credentials.get(function(err) {
+      if (err) {
+        console.error("Error loading AWS credentials:", err);
+        return;
+      }
+
+      console.log("Credentials are valid. Proceeding with DynamoDB operation...");
+
+      const docClient = new AWS.DynamoDB.DocumentClient();
+
+      const params = {
+        TableName: 'artHistoryGG',
+        Key: {
+          UserId: userId,
+          DataType: `LikedPainting#${paintingUrl}`
+        }
+      };
+
+      docClient.delete(params, function(err, data) {
+        if (err) {
+          console.error("Error unliking painting:", err);
+        } else {
+          console.log("Painting unliked successfully:", data);
+        }
+      });
+    });
+  }
+
+  // Function to handle the like/unlike click event
+  function handleLikeClick(event) {
+    const clickedElement = event.target;
+
+    if (clickedElement.getAttribute('user') === 'like') {
+      const paintingLink = clickedElement.parentElement.querySelector('[user="painting"]');
+      const paintingUrl = paintingLink.getAttribute('href');
+      const imgElement = paintingLink.querySelector('img');
+      const imgSrc = imgElement.getAttribute('src');
+      const altText = imgElement.getAttribute('alt');
+
+      // Use cached credentials
+      const userId = AWS.config.credentials.identityId;
+
+      // Proceed with the DynamoDB operation (like/unlike)
+      if (clickedElement.classList.contains('is-liked')) {
+        unlikePainting(userId, paintingUrl);
+        clickedElement.classList.remove('is-liked');
+      } else {
+        likePainting(userId, paintingUrl, imgSrc, altText);
+        clickedElement.classList.add('is-liked');
+      }
+    }
+  }
+
+  // Attach event listener to the document to handle clicks on user="like" elements
+  document.addEventListener('click', handleLikeClick);
+</script>
