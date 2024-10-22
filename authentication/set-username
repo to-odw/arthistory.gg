@@ -1,0 +1,108 @@
+<script>
+  // Ensure AWS region is set globally
+  AWS.config.region = 'us-east-2';  // Replace with your AWS region
+
+  // Function to update username in DynamoDB
+  function updateUsername(userId, newUsername) {
+    console.log(`Attempting to update username for userId: ${userId} with newUsername: ${newUsername}`);
+    
+    const docClient = new AWS.DynamoDB.DocumentClient();
+
+    const params = {
+      TableName: 'artHistoryGG',
+      Item: {
+        UserId: userId,
+        DataType: 'PublicUsername',
+        Username: newUsername
+      }
+    };
+
+    return docClient.put(params).promise()
+      .then(() => {
+        console.log(`Username successfully updated for userId: ${userId} with newUsername: ${newUsername}`);
+      })
+      .catch((err) => {
+        console.error('Error updating username:', err);
+      });
+  }
+
+  // Function to check if the username is unique
+  function checkUsernameUniqueness(newUsername) {
+    console.log(`Checking uniqueness for username: ${newUsername}`);
+    
+    const docClient = new AWS.DynamoDB.DocumentClient();
+
+    const params = {
+      TableName: 'artHistoryGG',
+      IndexName: 'DataType-Username-index',  // Make sure this is a GSI set up in DynamoDB to search by username
+      KeyConditionExpression: 'DataType = :dataType AND Username = :username',
+      ExpressionAttributeValues: {
+        ':dataType': 'PublicUsername',
+        ':username': newUsername
+      }
+    };
+
+    return docClient.query(params).promise()
+      .then((data) => {
+        console.log(`Query result for username uniqueness check:`, data);
+        return data;
+      })
+      .catch((err) => {
+        console.error('Error querying DynamoDB for uniqueness check:', err);
+      });
+  }
+
+  // Function to handle username submission
+  function handleUsernameSubmission() {
+    const usernameInput = document.querySelector('[user="usernameInput"]');
+    const username = usernameInput.value.trim();
+    const usernamePattern = /^[a-zA-Z0-9.]{1,15}$/;  // Only letters, numbers, periods, up to 15 characters
+
+    console.log(`Handling submission for username: ${username}`);
+
+    // Check if the username is valid
+    if (!usernamePattern.test(username)) {
+      alert('Invalid username. Only letters, numbers, and periods are allowed, and it must be under 15 characters.');
+      console.log(`Username validation failed for: ${username}`);
+      return;
+    }
+
+    // Check if the username is unique
+    checkUsernameUniqueness(username)
+      .then((data) => {
+        if (data.Items && data.Items.length > 0) {
+          // Username is not unique, show the error message
+          console.log(`Username is not unique: ${username}`);
+          const duplicateMessage = document.querySelector('[user="userNameDuplicate"]');
+          duplicateMessage.classList.add('show');
+        } else {
+          // Username is unique, proceed with updating it
+          console.log(`Username is unique: ${username}`);
+          
+          const userId = AWS.config.credentials.identityId;
+          console.log(`Updating username for userId: ${userId}`);
+
+          updateUsername(userId, username)
+            .then(() => {
+              alert('Username updated successfully.');
+              console.log(`Username updated successfully: ${username}`);
+            })
+            .catch((err) => {
+              console.error('Error updating username:', err);
+            });
+        }
+      })
+      .catch((err) => {
+        console.error('Error checking username uniqueness:', err);
+      });
+  }
+
+  // Attach event listener to the submit button
+  document.querySelector('[user="submitUsername"]').addEventListener('click', (event) => {
+    event.preventDefault();
+    handleUsernameSubmission();
+  });
+
+  // Add pattern validation on the input field
+  document.querySelector('[user="usernameInput"]').setAttribute('pattern', '[a-zA-Z0-9.]{1,15}');
+</script>
