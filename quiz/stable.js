@@ -208,7 +208,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
         // Hide game over and win screens if they are visible
         gameOverElement.classList.remove('show');
-        gameWinElement.classList.remove('show');
+        Element.classList.remove('show');
 
         console.log('Game has been reset.');
     }
@@ -397,7 +397,7 @@ document.addEventListener('DOMContentLoaded', function() {
             showGameOver();
         } else if (score >= winningScore) {
             console.log('Player has won the game!');
-            showGameWin();
+            show();
         }
     }
 
@@ -413,6 +413,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Show game win screen
     function showGameWin() {
+        gameWin();
         console.log('Showing game win screen.');
         // Hide multiple choice UI and show painting facts
         hideMultipleChoiceUI();
