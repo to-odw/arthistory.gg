@@ -1,0 +1,177 @@
+<script src="https://sdk.amazonaws.com/js/aws-sdk-2.1066.0.min.js"></script>
+<script>
+  AWS.config.region = 'us-east-2';  // Ensure AWS region is set globally
+
+  // Function to refresh the ID token using the refresh token
+  function refreshIdToken(refreshToken) {
+    console.log("Attempting to refresh ID token...");
+
+    const data = {
+      grant_type: 'refresh_token',
+      client_id: '6rc7lmrksbd9pn9245e005lmr',  // Your Cognito App Client ID
+      refresh_token: refreshToken
+    };
+
+    return fetch('https://join.arthistory.gg/oauth2/token', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded'
+      },
+      body: new URLSearchParams(data)
+    })
+    .then(response => response.json())
+    .then(tokens => {
+      if (tokens.id_token) {
+        console.log("ID token refreshed:", tokens.id_token);
+        cacheToken(tokens.id_token, refreshToken);  // Cache the new ID token
+        return tokens.id_token;
+      } else {
+        console.error("Failed to refresh ID token:", tokens);
+        return null;
+      }
+    })
+    .catch(err => {
+      console.error("Error refreshing ID token:", err);
+      return null;
+    });
+  }
+
+  // Step 1: Extract the authorization code from the URL
+  function getCodeFromUrl() {
+    const params = new URLSearchParams(window.location.search);
+    return params.get('code');
+  }
+
+  // Step 2: Exchange the authorization code for tokens
+  function exchangeCodeForTokens(code) {
+    console.log("Exchanging authorization code for tokens...");
+
+    const data = {
+      grant_type: 'authorization_code',
+      client_id: '6rc7lmrksbd9pn9245e005lmr',  // Your Cognito App Client ID
+      code: code,
+      redirect_uri: 'https://arthistory.gg/account'  // Ensure this matches Cognito settings
+    };
+
+    return fetch('https://join.arthistory.gg/oauth2/token', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded'
+      },
+      body: new URLSearchParams(data)
+    })
+    .then(response => response.json())
+    .then(tokens => {
+      if (tokens.id_token && tokens.refresh_token) {
+        console.log("Tokens received:", tokens);
+        cacheToken(tokens.id_token, tokens.refresh_token);
+        return federateWithCognito(tokens.id_token);
+      } else {
+        console.error("No ID token or refresh token found in the token response.");
+        return null;
+      }
+    })
+    .catch(err => {
+      console.error("Error exchanging authorization code for tokens:", err);
+      return null;
+    });
+  }
+
+  // Step 3: Federate with Cognito using the ID token
+  function federateWithCognito(idToken) {
+    console.log("Federating with Cognito Identity Pool using the ID token...");
+
+    AWS.config.credentials = new AWS.CognitoIdentityCredentials({
+      IdentityPoolId: 'us-east-2:0bf45b5f-b049-4621-832e-a3b44f3a3471',
+      Logins: {
+        'cognito-idp.us-east-2.amazonaws.com/us-east-2_pjX96kwEZ': idToken
+      }
+    });
+
+    return new Promise((resolve, reject) => {
+      AWS.config.credentials.get(function(err) {
+        if (err) {
+          console.error("Error getting AWS credentials:", err);
+          reject(err);
+        } else {
+          console.log("AWS credentials obtained successfully.");
+          cacheIdentityId(AWS.config.credentials.identityId);
+          resolve(AWS.config.credentials.identityId);
+        }
+      });
+    });
+  }
+
+  // Step 4: Cache the ID token and refresh token in localStorage
+  function cacheToken(idToken, refreshToken) {
+    localStorage.setItem('idToken', idToken);
+    localStorage.setItem('refreshToken', refreshToken);
+    console.log("ID token and refresh token cached.");
+  }
+
+  // Step 5: Cache the Cognito Identity ID in localStorage
+  function cacheIdentityId(identityId) {
+    localStorage.setItem('cognitoIdentityId', identityId);
+    console.log("Cognito Identity ID cached:", identityId);
+  }
+
+  // Step 6: Retrieve cached ID token from localStorage
+  function getCachedIdToken() {
+    return localStorage.getItem('idToken');
+  }
+
+  // Step 7: Retrieve cached refresh token from localStorage
+  function getCachedRefreshToken() {
+    return localStorage.getItem('refreshToken');
+  }
+
+  // Step 8: Refresh ID token if expired
+  function refreshCachedIdToken() {
+    const refreshToken = getCachedRefreshToken();
+    if (refreshToken) {
+      return refreshIdToken(refreshToken);
+    } else {
+      console.warn("No refresh token found in cache.");
+      return null;
+    }
+  }
+
+  // Step 9: Retrieve cached Cognito Identity ID from localStorage
+  function getCachedIdentityId() {
+    return localStorage.getItem('cognitoIdentityId');
+  }
+
+  // Step 10: Use cached credentials or refresh them if needed
+  function useCachedCredentials() {
+    const cachedIdToken = getCachedIdToken();
+    const cachedIdentityId = getCachedIdentityId();
+
+    if (cachedIdToken && cachedIdentityId) {
+      console.log("Using cached credentials...");
+      return federateWithCognito(cachedIdToken)
+        .catch(() => refreshCachedIdToken().then(federateWithCognito));
+    } else if (cachedIdToken) {
+      console.log("Using cached ID token...");
+      return federateWithCognito(cachedIdToken);
+    } else {
+      console.warn("No cached credentials found. User may need to log in.");
+      return Promise.resolve(null);
+    }
+  }
+
+  // Step 11: On page load, check for authorization code or use cached credentials
+  //This uses f from other scripts
+  window.onload = function() {
+    const code = getCodeFromUrl();
+    if (code) {
+      exchangeCodeForTokens(code).then(() => {
+        initializeUsername();
+      });
+    } else {
+      console.log("No authorization code found. Attempting to use cached credentials...");
+      useCachedCredentials().then(() => {
+        initializeUsername();
+      });
+    }
+  };
+</script>
