@@ -1,0 +1,153 @@
+<script>
+  AWS.config.region = 'us-east-2';  // Ensure AWS region is set globally
+
+  // Function to fetch leaderboard data from DynamoDB
+  async function fetchLeaderboardData() {
+    const docClient = new AWS.DynamoDB.DocumentClient();
+
+    // Query the GSI to get all items where DataType = 'PublicUsername'
+    const params = {
+      TableName: 'artHistoryGG',
+      IndexName: 'DataType-Username-index',  // GSI name
+      KeyConditionExpression: 'DataType = :dataType',
+      ExpressionAttributeValues: {
+        ':dataType': 'PublicUsername'
+      },
+      ProjectionExpression: 'UserId, Username'  // Fetch UserId and Username
+    };
+
+    try {
+      const data = await docClient.query(params).promise();
+
+      if (!data.Items || data.Items.length === 0) {
+        console.log('No leaderboard data found.');
+        return [];
+      }
+
+      // For each user, get their PlayerStats to retrieve the scores
+      const leaderboardData = await Promise.all(data.Items.map(async (item) => {
+        // Get PlayerStats for the user
+        const statsParams = {
+          TableName: 'artHistoryGG',
+          Key: {
+            'UserId': item.UserId,
+            'DataType': 'PlayerStats'
+          },
+          ProjectionExpression: 'Score1, Score2, Score3, Score4, Score5, Score6'
+        };
+
+        const statsData = await docClient.get(statsParams).promise();
+        const scores = statsData.Item || {};  // Ensure scores exist
+
+        // Calculate total score
+        const totalScore = calculateTotalScore(scores);
+
+        return {
+          PublicUsername: item.Username,  // Use Username from the first query
+          totalScore: totalScore
+        };
+      }));
+
+      return leaderboardData;
+
+    } catch (err) {
+      console.error('Error fetching leaderboard data:', err);
+      throw err;
+    }
+  }
+
+  // Function to calculate the total score based on the formula
+  function calculateTotalScore(scores) {
+    const score1 = scores.Score1 || 0;
+    const score2 = scores.Score2 || 0;
+    const score3 = scores.Score3 || 0;
+    const score4 = scores.Score4 || 0;
+    const score5 = scores.Score5 || 0;
+    const score6 = scores.Score6 || 0;
+
+    return (score1 * 3) + (score2 * 6) + (score3 * 7) + (score4 * 6) + (score5 * 10) + (score6 * 11);
+  }
+
+  // Function to render the leaderboard
+  function renderLeaderboard(leaderboardData) {
+    const leaderboardDiv = document.querySelector('[user="leaderboard"]');
+    if (!leaderboardDiv) {
+      console.error('Leaderboard container not found.');
+      return;
+    }
+
+    // Clear any existing content in the leaderboard div
+    leaderboardDiv.innerHTML = '';
+
+    // Sort users by total score in descending order
+    leaderboardData.sort((a, b) => b.totalScore - a.totalScore);
+
+    // Limit to the top 100 users
+    const topUsers = leaderboardData.slice(0, 100);
+
+    // Populate the leaderboard with rank, username, and total score
+    topUsers.forEach((user, index) => {
+      const rankDiv = document.createElement('div');
+      rankDiv.textContent = `${index + 1}.`;
+
+      const usernameDiv = document.createElement('div');
+      usernameDiv.textContent = user.PublicUsername;
+
+      const scoreDiv = document.createElement('div');
+      scoreDiv.textContent = user.totalScore;
+
+      // Append these divs to the leaderboard container
+      leaderboardDiv.appendChild(rankDiv);
+      leaderboardDiv.appendChild(usernameDiv);
+      leaderboardDiv.appendChild(scoreDiv);
+    });
+  }
+
+  // Function to load and display the leaderboard
+  function loadLeaderboard() {
+    fetchLeaderboardData()
+      .then((leaderboardData) => {
+        if (!leaderboardData || leaderboardData.length === 0) {
+          console.log('No leaderboard data to display.');
+          return;
+        }
+
+        // Render the leaderboard
+        renderLeaderboard(leaderboardData);
+      })
+      .catch((err) => {
+        console.error('Error loading leaderboard:', err);
+      });
+  }
+	
+  function waitForAWSSDK(callback) {
+  if (typeof AWS !== 'undefined' && AWS.config && AWS.config.credentials) {
+    // AWS SDK is ready
+    console.log("AWS SDK loaded successfully.");
+    callback();
+  } else {
+    // SDK not yet ready, try again in 100 milliseconds
+    console.log("AWS SDK not loaded yet. Retrying...");
+    setTimeout(() => waitForAWSSDK(callback), 150);  // Retry every 100ms
+  }
+}
+
+// Function to initialize the leaderboard
+function initializeLeaderboard() {
+  console.log("Initializing leaderboard...");
+  AWS.config.credentials.get(function (err) {
+    if (err) {
+      console.error("Error loading AWS credentials:", err);
+    } else {
+      console.log("AWS credentials loaded. Now loading leaderboard.");
+      loadLeaderboard();  // Call loadLeaderboard once credentials are ready
+    }
+  });
+}
+
+// Start checking for AWS SDK after DOM is loaded
+document.addEventListener('DOMContentLoaded', () => {
+  waitForAWSSDK(initializeLeaderboard);  // Wait for the SDK, then initialize leaderboard
+});
+
+</script>
