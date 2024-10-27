@@ -113,83 +113,48 @@
     });
   }
 
+  // Ensure credentials are loaded before performing any operations
+  function initializeLikedPaintings() {
+    AWS.config.credentials.get(function(err) {
+      if (err) {
+        console.error("Error loading AWS credentials:", err);
+        return;
+      }
+      console.log("Credentials loaded. Calling loadLikedPaintings...");
+      loadLikedPaintings();  // Load liked paintings on page load
+    });
+  }
+
   // Attach event listener to the document to handle clicks on user="like" elements
   document.addEventListener('click', handleLikeClick);
 
-  // Expose loadLikedPaintings so it can be triggered externally after authentication
-  window.loadLikedPaintings = loadLikedPaintings;
+  // Run the initialization when the page first loads
+  //document.addEventListener('DOMContentLoaded', initializeLikedPaintings);
 
-  // Function to observe new paintings being added to the DOM
-  function observeNewPaintings() {
-    const observer = new MutationObserver(function(mutations) {
-      mutations.forEach(function(mutation) {
-        mutation.addedNodes.forEach(function(addedNode) {
-          if (addedNode.nodeType === 1) {  // Ensure it's an element node
-            const newPaintings = addedNode.querySelectorAll('[user="painting"]');
-            newPaintings.forEach(function(paintingLink) {
-              const paintingUrl = paintingLink.getAttribute('href');
-              const likeButton = paintingLink.parentElement.querySelector('[user="like"]');
-
-              // Check if this painting was previously liked by the user and update UI accordingly
-              const userId = AWS.config.credentials.identityId;
-              const docClient = new AWS.DynamoDB.DocumentClient();
-
-              const params = {
-                TableName: 'artHistoryGG',
-                KeyConditionExpression: 'UserId = :userId AND DataType = :dataType',
-                ExpressionAttributeValues: {
-                  ':userId': userId,
-                  ':dataType': `LikedPainting#${paintingUrl}`
-                }
-              };
-
-              docClient.query(params, function(err, data) {
-                if (err) {
-                  console.error("Error checking liked painting status:", err);
-                } else if (data.Items.length > 0 && likeButton) {
-                  likeButton.classList.add('is-liked');  // Mark the painting as liked
-                }
-              });
-            });
-          }
-        });
-      });
-    });
-
-    observer.observe(document.body, { childList: true, subtree: true });
-  }
-
-  // Expose observeNewPaintings so it can be triggered externally
-  window.observeNewPaintings = observeNewPaintings;
-  //script break
+  // Listen for dynamically loaded items via `cmsload`
   window.fsAttributes = window.fsAttributes || [];
   window.fsAttributes.push([
     'cmsload',
     (listInstances) => {
       console.log('cmsload Successfully loaded!');
 
-      // The callback passes a `listInstances` array with all the `CMSList` instances on the page.
       const [listInstance] = listInstances;
 
-      // The `renderitems` event runs whenever the list renders items after switching pages or loading new items.
+      // Listen for when new items are rendered dynamically
       listInstance.on('renderitems', (renderedItems) => {
         console.log('New items rendered:', renderedItems);
 
         // Call loadLikedPaintings to check the newly added user="painting" elements
-        loadLikedPaintings();
+        loadLikedPaintings();  // Check liked status for new items
 
-        // If you need to observe new paintings dynamically
+        // If needed, iterate through the newly rendered items for further customization
         renderedItems.forEach((item) => {
-          // Find all new painting elements within the rendered items
           const newPaintings = item.element.querySelectorAll('[user="painting"]');
           newPaintings.forEach((painting) => {
             console.log('New painting element detected:', painting);
-            
-            // You can do more with the painting element here if needed
-            // E.g., handle clicks, set event listeners, etc.
           });
         });
       });
-    },
+    }
   ]);
 </script>
