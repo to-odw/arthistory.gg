@@ -46,32 +46,43 @@
       }
     });
   }
+  
+// Function to handle the like/unlike click event
+function handleLikeClick(event) {
+  const clickedElement = event.target;
 
-  // Function to handle the like/unlike click event
-  function handleLikeClick(event) {
-    const clickedElement = event.target;
+  if (clickedElement.getAttribute('user') === 'like') {
+    // Check if the user is logged in
+    const userId = AWS.config.credentials?.identityId;
 
-    if (clickedElement.getAttribute('user') === 'like') {
-      const paintingLink = clickedElement.parentElement.querySelector('[user="painting"]');
-      const paintingUrl = paintingLink.getAttribute('href');
-      const imgElement = paintingLink.querySelector('img');
-      const imgSrc = imgElement.getAttribute('src');
-      const altText = imgElement.getAttribute('alt');
-
-      // Use cached credentials from Script 1
-      const userId = AWS.config.credentials.identityId;
-
-      // Proceed with the DynamoDB operation (like/unlike)
-      if (clickedElement.classList.contains('is-liked')) {
-        unlikePainting(userId, paintingUrl);
-        clickedElement.classList.remove('is-liked');
+    if (!userId) {
+      // User is not logged in, display the authTrigger element
+      const authTriggerElement = document.querySelector('[user="authTrigger"]');
+      if (authTriggerElement) {
+        authTriggerElement.style.display = 'block';
       } else {
-        likePainting(userId, paintingUrl, imgSrc, altText);
-        clickedElement.classList.add('is-liked');
+        console.error('Auth trigger element not found');
       }
+      return;  // Exit the function to prevent further execution
+    }
+
+    // Proceed with liking/unliking the painting if the user is authenticated
+    const paintingLink = clickedElement.parentElement.querySelector('[user="painting"]');
+    const paintingUrl = paintingLink.getAttribute('href');
+    const imgElement = paintingLink.querySelector('img');
+    const imgSrc = imgElement.getAttribute('src');
+    const altText = imgElement.getAttribute('alt');
+
+    // Toggle like/unlike state and update DynamoDB
+    if (clickedElement.classList.contains('is-liked')) {
+      unlikePainting(userId, paintingUrl);
+      clickedElement.classList.remove('is-liked');
+    } else {
+      likePainting(userId, paintingUrl, imgSrc, altText);
+      clickedElement.classList.add('is-liked');
     }
   }
-
+}
   // Function to load liked paintings and update the UI
   function loadLikedPaintings() {
     const userId = AWS.config.credentials.identityId;
