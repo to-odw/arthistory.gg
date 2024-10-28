@@ -143,29 +143,44 @@ function handleLikeClick(event) {
   //document.addEventListener('DOMContentLoaded', initializeLikedPaintings);
 
   // Listen for dynamically loaded items via `cmsload`
-  window.fsAttributes = window.fsAttributes || [];
-  window.fsAttributes.push([
-    'cmsload',
-    (listInstances) => {
-      console.log('cmsload Successfully loaded!');
+	window.fsAttributes = window.fsAttributes || [];
+	window.fsAttributes.push([
+  'cmsload',
+  (listInstances) => {
+    console.log('cmsload Successfully loaded!');
 
+    if (listInstances && listInstances.length > 0) {
       const [listInstance] = listInstances;
 
-      // Listen for when new items are rendered dynamically
-      listInstance.on('renderitems', (renderedItems) => {
-        console.log('New items rendered:', renderedItems);
+      // Ensure listInstance is available and has an on method
+      if (listInstance && typeof listInstance.on === 'function') {
+        // Listen for when new items are rendered dynamically
+        listInstance.on('renderitems', (renderedItems) => {
+          console.log('New items rendered:', renderedItems);
 
-        // Call loadLikedPaintings to check the newly added user="painting" elements
-        loadLikedPaintings();  // Check liked status for new items
+          // Call loadLikedPaintings to check the newly added user="painting" elements
+          loadLikedPaintings();  // Check liked status for new items
 
-        // If needed, iterate through the newly rendered items for further customization
-        renderedItems.forEach((item) => {
-          const newPaintings = item.element.querySelectorAll('[user="painting"]');
-          newPaintings.forEach((painting) => {
-            console.log('New painting element detected:', painting);
-          });
+          // If there are rendered items, iterate through them for further customization
+          if (renderedItems && renderedItems.length > 0) {
+            renderedItems.forEach((item) => {
+              const newPaintings = item.element.querySelectorAll('[user="painting"]');
+              
+              // Log each new painting element detected
+              newPaintings.forEach((painting) => {
+                console.log('New painting element detected:', painting);
+              });
+            });
+          } else {
+            console.log('No new items rendered.');
+          }
         });
-      });
+      } else {
+        console.log('listInstance or listInstance.on is not available.');
+      }
+    } else {
+      console.log('No listInstances available from cmsload.');
     }
-  ]);
+  }
+]);
 </script>
