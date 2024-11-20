@@ -69,10 +69,13 @@ function handleLikeClick(event) {
     // Proceed with liking/unliking the painting if the user is authenticated
     const paintingLink = clickedElement.parentElement.querySelector('[user="painting"]');
     const paintingUrl = paintingLink.getAttribute('href');
-    const imgElement = paintingLink.querySelector('img');
-    const imgSrc = imgElement.getAttribute('src');
-    const altText = imgElement.getAttribute('alt');
 
+    // Find the image element that is either a sibling with user="ImgSrc" or a child of paintingLink
+    const imgElement = paintingLink.querySelector('[user="ImgSrc"]') || clickedElement.parentElement.querySelector('[user="ImgSrc"]');
+    const imgSrc = imgElement ? imgElement.getAttribute('src') : null;
+    const altText = imgElement ? imgElement.getAttribute('alt') : '';
+
+	  
     // Toggle like/unlike state and update DynamoDB
     if (clickedElement.classList.contains('is-liked')) {
       unlikePainting(userId, paintingUrl);
